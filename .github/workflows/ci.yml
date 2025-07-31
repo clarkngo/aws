@@ -1,4 +1,4 @@
-name: CI-CD
+name: "CI-CD"
 
 on:
   push:
@@ -52,5 +52,3 @@ jobs:
 
       - name: Output ngrok URL
         run: echo "Public URL from ngrok: ${{ steps.ngrok.outputs.ngrok_url }}"
-
-
