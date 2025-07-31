@@ -1,57 +1,61 @@
-name: CI-CD
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
-
-jobs:
-  build_test:
+  deploy:
+    name: Push to EC2 Instance
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [20.x]
+    needs: build_test
 
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Install dependencies
-        run: |
-          npm install
-          npm ci
-        working-directory: backend-expressjs
+      - name: Checkout the code
+        uses: actions/checkout@v2
 
       - name: Create .env file
-        run: echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > backend-expressjs/.env
-
-      - name: Start backend
         run: |
-          cd backend-expressjs
-          nohup npm start > server.log 2>&1 &
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Deploy backend code and .env to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_PUBLIC_DNS }} "rm -rf ~/backend-expressjs && mkdir ~/backend-expressjs"
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -r backend-expressjs/* ubuntu@${{ secrets.EC2_PUBLIC_DNS }}:~/backend-expressjs/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key .env ubuntu@${{ secrets.EC2_PUBLIC_DNS }}:~/backend-expressjs/.env
+
+      - name: Start backend server and expose with ngrok
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_PUBLIC_DNS }} << 'EOF'
+          # Install dependencies
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm unzip curl
+
+          # Kill any process on port 3000
+          sudo lsof -t -i:3000 | sudo xargs kill -9 || true
+
+          # Run backend
+          cd ~/backend-expressjs
+          npm install
+          export $(cat .env | xargs)
+          nohup npm start > app.log 2>&1 &
+
+          # Download ngrok if not exists
+          if [ ! -f ngrok ]; then
+            curl -s https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-stable-linux-amd64.zip -o ngrok.zip
+            unzip ngrok.zip
+            chmod +x ngrok
+          fi
+
+          # Authenticate ngrok
+          ./ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+          # Start ngrok on port 3000
+          nohup ./ngrok http 3000 --log=stdout > ngrok.log 2>&1 &
           sleep 5
 
-      - name: Install ngrok
-        run: npm install -g ngrok
-
-      - name: Start ngrok tunnel
-        id: ngrok
-        run: |
-          ngrok config add-authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
-          nohup ngrok http 3000 > ngrok.log &
-          sleep 5
-          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-          echo "Ngrok URL: $NGROK_URL"
-          echo "ngrok_url=$NGROK_URL" >> $GITHUB_OUTPUT      
-
-      - name: Output ngrok URL
-        run: |
-          echo "Public URL from ngrok: $NGROK_URL"
+          # Print ngrok public URL
+          curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+          EOF
         env:
-          NGROK_URL: ${{ steps.ngrok.outputs.ngrok_url }}
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_PUBLIC_DNS: ${{ secrets.EC2_PUBLIC_DNS }}
