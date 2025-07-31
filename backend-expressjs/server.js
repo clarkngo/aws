@@ -9,9 +9,7 @@ const app = express();
 const port = 3000;
 
 // Enable CORS
-app.use(cors({
-  origin: '*', 
-}));
+app.use(cors());
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {

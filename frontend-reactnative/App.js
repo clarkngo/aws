@@ -14,11 +14,8 @@ const App = () => {
           setLoading(false);
           return; 
         }
-        console.log('API_URL:', API_URL);
-        const moviesEndpoint = `${API_URL}/movies`;
-        console.log('movies endpoint:', moviesEndpoint);
         try {
-          const response = await fetch(moviesEndpoint);
+          const response = await fetch(`${API_URL}/movies`);
           const data = await response.json();
           const formattedData = data.map(movie => ({
             title: movie.title,
