@@ -49,6 +49,9 @@ jobs:
           NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
           echo "Ngrok URL: $NGROK_URL"
           echo "ngrok_url=$NGROK_URL" >> $GITHUB_OUTPUT      
-            
+
       - name: Output ngrok URL
-        run: echo "Public URL from ngrok: ${{ steps.ngrok.outputs.ngrok_url }}"
+        run: |
+          echo "Public URL from ngrok: $NGROK_URL"
+        env:
+          NGROK_URL: ${{ steps.ngrok.outputs.ngrok_url }}
