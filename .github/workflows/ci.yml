@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
-
-permissions:
-  contents: read
-  issues: write
   
 jobs:
   build_test:
@@ -124,3 +120,8 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_PUBLIC_DNS: ${{ secrets.EC2_PUBLIC_DNS }}
+
+      - name: Print ngrok public URL
+        run: |
+          curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+          EOF
