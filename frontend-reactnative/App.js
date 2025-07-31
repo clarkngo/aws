@@ -14,6 +14,7 @@ const App = () => {
           setLoading(false);
           return; 
         }
+        console.log('API_URL:', API_URL);
         try {
           const response = await fetch(`${API_URL}/movies`);
           const data = await response.json();
