@@ -121,7 +121,11 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_PUBLIC_DNS: ${{ secrets.EC2_PUBLIC_DNS }}
 
-      - name: Print ngrok public URL
+      - name: Print Ngrok Public URL
         run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ubuntu@${{ secrets.EC2_PUBLIC_DNS }} << 'EOF'
+          # Wait a bit just in case ngrok is still starting
+          sleep 5
+          # Fetch the public URL from ngrok's local API
           curl --silent http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
           EOF
